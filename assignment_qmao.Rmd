@@ -1,0 +1,68 @@
+---
+title: "assignment_qmao"
+author: "Qing Mao"
+date: "4/29/2020"
+output: html_document
+---
+
+## Executive Summary
+Six young health participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions: exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E). Class A corresponds to the specified execution of the exercise, while the other 4 classes correspond to common mistakes.THe reacorded dataset is from http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har.
+The goal of this analysis is to use training dataset to build a model that would be able to predict a given exercise whether it's performed in the correct form.
+
+
+## Report
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message=FALSE,fig.pos="!H")
+library(ggplot2)
+library(GGally)
+library(caret)
+```
+### Load the data and explore only the training data 
+```{r load_data, echo=TRUE, warning=FALSE, message=FALSE}
+training_data=read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv")
+testing_data=read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv")
+```
+```{r explore_training_data, echo=TRUE, warning=FALSE, message=FALSE}
+#### exploratory on training data only ####
+#### For rows with new_window=="yes", the measurements are a summary for that measurement window, and the summary measurements (average, sd, etc.) are only applicable to those rows, and most of the other rows are NAs. Thus remove those columns for future analysis.
+training_select=subset(training_data,select=c(8:11,37:49,60:68,84:86,102,113:124,140,151:160))
+
+ggpairs(training_select[,c(1:4,53)],aes(color=classe))
+ggpairs(training_select[,c(14:17,53)],aes(color=classe))
+ggpairs(training_select[,c(27:30,53)],aes(color=classe))
+ggpairs(training_select[,c(40:43,53)],aes(color=classe))
+
+```
+### Train prediction models and evaluate their performances. The Out of Sample error rate can be evaluated by applying the model on the testing dataset and calculate the accuracy. Because the data has a decent size, cross validation can be performed within the training data only.
+```{r train_model, echo=TRUE}
+### in testing_data, the outcome column is not provided, but can be identified from the training data columns of username, timestamp 
+testing_data=merge(testing_data,unique(training_data[,c("user_name","raw_timestamp_part_1","cvtd_timestamp","num_window","classe")]),all.x=T)
+
+### a combination of numerial predictors to predict a factor variable outcome
+### test1: try randome forest, with cross validation
+rf_model=train(classe~.,training_select,method="rpart",
+              trControl=trainControl(method="cv",number=10),set.seed(123))
+rf_predict_test=predict(rf_model,testing_data)
+rf_accuracy=confusionMatrix(factor(testing_data$classe),rf_predict_test)
+rf_accuracy
+### test2: try lda
+lda_model=train(classe~.,training_select,method="lda",
+              trControl=trainControl(method="cv",number=10),set.seed(123))
+lda_predict_test=predict(lda_model,testing_data)
+lda_accuracy=confusionMatrix(factor(testing_data$classe),lda_predict_test)
+lda_accuracy
+### test3: gbm
+gbm_model=train(classe~.,training_select,method="gbm",
+              trControl=trainControl(method="cv",number=10),set.seed(123),
+              verbose=FALSE)
+gbm_predict_test=predict(gbm_model,testing_data)
+gbm_accuracy=confusionMatrix(factor(testing_data$classe),gbm_predict_test)
+gbm_accuracy
+```
+
+
+## Conclusion/Discussion
+From the analysi above, with gbm modeling, the model was able to produce 100% accuracy with the given 20 testing data points.
+
+
+
